@@ -40,15 +40,9 @@ for DOMAIN in $(cat $DOMAINS_FILE); do
   curl -s "https://crt.sh/?q=%25.$DOMAIN&output=json" | jq -r '.[].name_value' | sort -u | tee -a subs_crtsh.txt
 done
 
-# Use CertSpotter to gather more subdomains
-echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running CertSpotter...\e[0m"
-for DOMAIN in $(cat $DOMAINS_FILE); do
-  certspotter $DOMAIN | jq -r '.dns_names[]' | sort -u | tee -a subs_certspotter.txt
-done
-
 # Combine results from different tools
 echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Combining subdomains from various sources...\e[0m"
-cat subs_subfinder.txt subs_assetfinder.txt subs_github.txt subs_crtsh.txt subs_certspotter.txt | sort -u > allSubs.txt
+cat subs_subfinder.txt subs_assetfinder.txt subs_github.txt subs_crtsh.txt| sort -u > allSubs.txt
 
 # Run dnsx to filter out non-resolving subdomains
 echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: dnsx...\e[0m"
