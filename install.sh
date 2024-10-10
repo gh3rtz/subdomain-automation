@@ -1,40 +1,52 @@
 #!/bin/bash
+set -euo pipefail
 
-echo -e "\e[94m[+] Updating package list...\e[0m"
+# Function to print messages with colors
+print_message() {
+    local color="$1"
+    shift
+    echo -e "${color}[+] $*${NC}"
+}
+
+# Define color codes
+NC='\e[0m' # No Color
+BLUE='\e[94m'
+GREEN='\e[92m'
+
+# Update package list
+print_message "$BLUE" "Updating package list..."
 sudo apt update
 
 # Install basic dependencies
-echo -e "\e[94m[+] Installing basic dependencies...\e[0m"
+print_message "$BLUE" "Installing basic dependencies..."
 sudo apt install -y curl git jq python3 python3-pip
 
 # Install Golang if not already installed
 if ! command -v go &> /dev/null; then
-    echo -e "\e[94m[+] Installing Golang...\e[0m"
+    print_message "$BLUE" "Installing Golang..."
     sudo apt install -y golang-go
+else
+    print_message "$BLUE" "Golang is already installed."
 fi
 
-# Install subfinder
-echo -e "\e[94m[+] Installing subfinder...\e[0m"
-go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+# Function to install a Go tool
+install_go_tool() {
+    local tool_name="$1"
+    local tool_repo="$2"
+    
+    print_message "$BLUE" "Installing $tool_name..."
+    go install "$tool_repo"@latest
+}
 
-# Install assetfinder
-echo -e "\e[94m[+] Installing assetfinder...\e[0m"
-go install github.com/tomnomnom/assetfinder@latest
-
-# Install github-subdomains
-echo -e "\e[94m[+] Installing github-subdomains...\e[0m"
-go install github.com/gwen001/github-subdomains@latest
-
-# Install httpx
-echo -e "\e[94m[+] Installing httpx...\e[0m"
-go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-
-# Install dnsx
-echo -e "\e[94m[+] Installing dnsx...\e[0m"
-go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+# Install tools
+install_go_tool "Subfinder" "github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+install_go_tool "Assetfinder" "github.com/tomnomnom/assetfinder"
+install_go_tool "GitHub Subdomains" "github.com/gwen001/github-subdomains"
+install_go_tool "HTTPX" "github.com/projectdiscovery/httpx/cmd/httpx"
+install_go_tool "DNSX" "github.com/projectdiscovery/dnsx/cmd/dnsx"
 
 # Move Go binaries to /usr/local/bin
-echo -e "\e[94m[+] Moving Go binaries to /usr/local/bin...\e[0m"
+print_message "$BLUE" "Moving Go binaries to /usr/local/bin..."
 sudo mv ~/go/bin/* /usr/local/bin/
 
-echo -e "\e[92m[+] Installation complete! All tools are installed and available in /usr/local/bin.\e[0m"
+print_message "$GREEN" "Installation complete! All tools are installed and available in /usr/local/bin."
