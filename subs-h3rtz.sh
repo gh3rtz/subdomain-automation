@@ -10,10 +10,6 @@ NC='\e[0m' # No Color
 
 # Define file names
 DOMAINS_FILE="domains"
-GIT_TOKEN_FILE="$HOME/.git/git-token.txt"
-
-# Read GitHub token from file
-GITHUB_TOKEN=$(<"$GIT_TOKEN_FILE")
 
 # Print ASCII Art
 cat << "EOF"
@@ -40,11 +36,11 @@ run_assetfinder() {
     assetfinder -subs-only < "$DOMAINS_FILE" | tee subs_assetfinder.txt
 }
 
-# Scrape GitHub for subdomains
-run_github_subdomains() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: github-subdomains...\e[0m"
+# Run sublist3r
+run_sublist3r() {
+    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: sublist3r...\e[0m"
     while IFS= read -r DOMAIN; do
-        github-subdomains -d "$DOMAIN" -t "$GITHUB_TOKEN" >> subs_github.txt
+        sublist3r -d "$DOMAIN" -o subs_sublist3r.txt
     done < "$DOMAINS_FILE"
 }
 
@@ -52,14 +48,20 @@ run_github_subdomains() {
 run_crtsh() {
     echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running crt.sh...\e[0m"
     while IFS= read -r DOMAIN; do
-        curl -s "https://crt.sh/?q=%25.$DOMAIN&output=json" | jq -r '.[].name_value' | sort -u >> subs_crtsh.txt
+        RESPONSE=$(curl -s "https://crt.sh/?q=%25.$DOMAIN&output=json")
+        if echo "$RESPONSE" | jq . >/dev/null 2>&1; then
+            echo "$RESPONSE" | jq -r '.[].name_value' | sort -u >> subs_crtsh.txt
+        else
+            echo -e "${RED}[-] Invalid response from crt.sh for $DOMAIN${NC}" >&2
+        fi
+        sleep 1 # Delay to avoid hitting rate limits
     done < "$DOMAINS_FILE"
 }
 
 # Combine results from different tools
 combine_results() {
     echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Combining subdomains from various sources...\e[0m"
-    cat subs_subfinder.txt subs_assetfinder.txt subs_github.txt subs_crtsh.txt | sort -u > allSubs.txt
+    cat subs_subfinder.txt subs_assetfinder.txt subs_sublist3r.txt subs_crtsh.txt | sort -u > allSubs.txt
 }
 
 # Run dnsx to filter out non-resolving subdomains
@@ -88,7 +90,7 @@ output_results() {
 # Main execution flow
 run_subfinder
 run_assetfinder
-run_github_subdomains
+run_sublist3r
 run_crtsh
 combine_results
 run_dnsx
