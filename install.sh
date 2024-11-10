@@ -29,13 +29,17 @@ else
     print_message "$BLUE" "Golang is already installed."
 fi
 
-# Function to install a Go tool
+# Function to install a Go tool if not already installed
 install_go_tool() {
     local tool_name="$1"
     local tool_repo="$2"
     
-    print_message "$BLUE" "Installing $tool_name..."
-    go install "$tool_repo"@latest
+    if ! command -v "${tool_name,,}" &> /dev/null; then
+        print_message "$BLUE" "Installing $tool_name..."
+        go install "$tool_repo"@latest
+    else
+        print_message "$BLUE" "$tool_name is already installed."
+    fi
 }
 
 # Install tools
@@ -44,6 +48,7 @@ install_go_tool "Assetfinder" "github.com/tomnomnom/assetfinder"
 install_go_tool "GitHub Subdomains" "github.com/gwen001/github-subdomains"
 install_go_tool "HTTPX" "github.com/projectdiscovery/httpx/cmd/httpx"
 install_go_tool "DNSX" "github.com/projectdiscovery/dnsx/cmd/dnsx"
+install_go_tool "Subjack" "github.com/haccer/subjack"
 
 # Move Go binaries to /usr/local/bin
 print_message "$BLUE" "Moving Go binaries to /usr/local/bin..."

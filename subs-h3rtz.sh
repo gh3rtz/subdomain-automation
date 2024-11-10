@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Define colors
-GREEN='\e[32m'
-BLUE='\e[34m'
-RED='\e[31m'
-YELLOW='\e[33m'
-NC='\e[0m' # No Color
+GREEN=$'\033[32m'
+BLUE=$'\033[34m'
+RED=$'\033[31m'
+YELLOW=$'\033[33m'
+NC=$'\033[0m' # No Color
 
 # Define file names
 DOMAINS_FILE="domains"
@@ -26,57 +26,55 @@ EOF
 
 # Run subfinder
 run_subfinder() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: subfinder...\e[0m"
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: subfinder...${NC}"
     subfinder -dL "$DOMAINS_FILE" | tee subs_subfinder.txt
 }
 
 # Run assetfinder
 run_assetfinder() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: assetfinder...\e[0m"
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: assetfinder...${NC}"
     assetfinder -subs-only < "$DOMAINS_FILE" | tee subs_assetfinder.txt
 }
 
-# Run sublist3r
-run_sublist3r() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: sublist3r...\e[0m"
-    while IFS= read -r DOMAIN; do
-        sublist3r -d "$DOMAIN" -o subs_sublist3r.txt
-    done < "$DOMAINS_FILE"
-}
-
-# Use crt.sh to get subdomains from Certificate Transparency Logs
+# Run crtsh
 run_crtsh() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running crt.sh...\e[0m"
-    while IFS= read -r DOMAIN; do
-        RESPONSE=$(curl -s "https://crt.sh/?q=%25.$DOMAIN&output=json")
-        if echo "$RESPONSE" | jq . >/dev/null 2>&1; then
-            echo "$RESPONSE" | jq -r '.[].name_value' | sort -u >> subs_crtsh.txt
-        else
-            echo -e "${RED}[-] Invalid response from crt.sh for $DOMAIN${NC}" >&2
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: crtsh...${NC}"
+    # Create an empty file to avoid "No such file or directory" error later
+    : > subs_crtsh.txt
+
+    while read -r domain; do
+        # Run crtsh only if the domain is non-empty
+        if [[ -n "$domain" ]]; then
+            python3 /usr/local/bin/crtsh -d "$domain" >> subs_crtsh.txt || echo "[ERR] Failed to retrieve data for $domain" >&2
         fi
-        sleep 1 # Delay to avoid hitting rate limits
     done < "$DOMAINS_FILE"
 }
 
 # Combine results from different tools
 combine_results() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Combining subdomains from various sources...\e[0m"
-    cat subs_subfinder.txt subs_assetfinder.txt subs_sublist3r.txt subs_crtsh.txt | sort -u > allSubs.txt
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Combining subdomains from various sources...${NC}"
+    cat subs_subfinder.txt subs_assetfinder.txt subs_crtsh.txt | sort -u > allSubs.txt
 }
 
 # Run dnsx to filter out non-resolving subdomains
 run_dnsx() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: dnsx...\e[0m"
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: dnsx...${NC}"
     dnsx -silent < allSubs.txt | tee resolved_subs.txt
 }
 
 # Run HTTPX with concurrency and categorize subdomains
 run_httpx() {
-    echo -e "\e[94m[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: httpx...\e[0m"
-    httpx -l resolved_subs.txt -mc 200 -threads 100 | tee active_subs.txt
-    httpx -l resolved_subs.txt -mc 301,302,303 -threads 100 | tee redirect_subs.txt
-    httpx -l resolved_subs.txt -mc 401,403,405 -threads 100 | tee forbidden_subs.txt
-    httpx -l resolved_subs.txt -mc 404,500 -threads 100 | tee takeovers_subs.txt
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: httpx...${NC}"
+    httpx-toolkit -l resolved_subs.txt -mc 200,201,202,204,301 -threads 100 -silent | tee active_subs.txt
+    httpx-toolkit -l resolved_subs.txt -mc 300,303,307,308 -threads 100 | tee redirect_subs.txt
+    httpx-toolkit -l resolved_subs.txt -mc 401,402,403,405,407,408 -threads 100 | tee forbidden_subs.txt
+    httpx-toolkit -l resolved_subs.txt -mc 404,500,503 -threads 100 | tee takeovers_subs.txt
+}
+
+# Run Subjack for subdomain takeover detection on potential takeover subdomains
+run_subjack() {
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] [+] Running tool: subjack...${NC}"
+    subjack -w takeovers_subs.txt -o potential_takeovers.txt -c /Users/h3rtz/Tools/fingerprints.json -ssl -v
 }
 
 # Output results with colors
@@ -85,14 +83,15 @@ output_results() {
     echo -e "${BLUE}[+] Redirect Subdomains saved to redirect_subs.txt${NC}"
     echo -e "${RED}[-] Forbidden Subdomains saved to forbidden_subs.txt${NC}"
     echo -e "${YELLOW}[*] Takeover Subdomains saved to takeovers_subs.txt${NC}"
+    echo -e "${YELLOW}[!] Potential Takeover Subdomains saved to potential_takeovers.txt${NC}"
 }
 
 # Main execution flow
 run_subfinder
 run_assetfinder
-run_sublist3r
 run_crtsh
 combine_results
 run_dnsx
 run_httpx
+run_subjack
 output_results
