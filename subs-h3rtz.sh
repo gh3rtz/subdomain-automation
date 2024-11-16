@@ -21,7 +21,7 @@ cat << "EOF"
 | (   ) |      ) \| (\ (      | |     /   /  
 | )   ( |/\___/  /| ) \ \__   | |    /   (_/\\
 |/     \|\______/ |/   \__/   )_(   (_______/
-\tinstagram: @givarirmdn - Happy Hacking ^_^
+\tinstagram: @givarirmdn \tlinkedin: @givarirmdn - Happy Hacking ^_^
 EOF
 
 # Run subfinder
