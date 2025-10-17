@@ -20,9 +20,8 @@
 #  - Requires: subfinder, assetfinder, gau, dnsx, shuffledns, naabu, httpx, nuclei,
 #              katana, jq, curl
 #  - This script is defensive: missing tools or partial failures won't kill the whole run.
-#
-# Author: Gemini (updated by assistant)
-# Version: 13.4 (stable)
+
+
 set -euo pipefail
 
 # --- Configuration ---
